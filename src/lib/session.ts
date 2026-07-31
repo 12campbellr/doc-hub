@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export type SessionUser = {
   id: string;
@@ -8,10 +9,19 @@ export type SessionUser = {
   role: "ADMIN" | "TECHNICIAN";
 };
 
+/**
+ * Resolves the current user, re-checking the DB so a deleted account loses
+ * access immediately rather than waiting for its existing JWT to expire.
+ */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const session = await getServerSession(authOptions);
   if (!session?.user) return null;
-  return session.user as unknown as SessionUser;
+  const user = session.user as unknown as SessionUser;
+
+  const stillExists = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
+  if (!stillExists) return null;
+
+  return user;
 }
 
 export class UnauthorizedError extends Error {

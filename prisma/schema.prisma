@@ -29,8 +29,8 @@ model Folder {
   children  Folder[] @relation("FolderChildren")
   files     File[]
 
-  createdById String
-  createdBy   User   @relation("FolderCreatedBy", fields: [createdById], references: [id])
+  createdById String?
+  createdBy   User?   @relation("FolderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
@@ -48,8 +48,8 @@ model File {
   folderId String?
   folder   Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
 
-  uploadedById String
-  uploadedBy   User   @relation("FileUploadedBy", fields: [uploadedById], references: [id])
+  uploadedById String?
+  uploadedBy   User?   @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 

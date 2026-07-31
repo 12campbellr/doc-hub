@@ -15,6 +15,7 @@ export default async function AdminUsersPage() {
 
   return (
     <AdminUsersView
+      currentUserId={user.id}
       initialUsers={users.map((u) => ({
         ...u,
         role: u.role as "ADMIN" | "TECHNICIAN",

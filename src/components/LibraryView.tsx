@@ -15,7 +15,7 @@ async function apiFetch(url: string, options?: RequestInit) {
   return res.json().catch(() => ({}));
 }
 
-function canManage(currentUser: CurrentUser, ownerId: string) {
+function canManage(currentUser: CurrentUser, ownerId: string | null) {
   return currentUser.role === "ADMIN" || currentUser.id === ownerId;
 }
 

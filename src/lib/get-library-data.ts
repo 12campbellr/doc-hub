@@ -36,7 +36,7 @@ export async function getLibraryData(folderId: string | null) {
     sizeBytes: f.sizeBytes,
     createdAt: f.createdAt.toISOString(),
     uploadedById: f.uploadedById,
-    uploadedByName: f.uploadedBy.name,
+    uploadedByName: f.uploadedBy?.name ?? "Removed user",
   }));
 
   return { breadcrumb, folders: folderSummaries, files: fileSummaries };

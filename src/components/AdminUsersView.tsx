@@ -10,7 +10,13 @@ type UserRow = {
   createdAt: string;
 };
 
-export default function AdminUsersView({ initialUsers }: { initialUsers: UserRow[] }) {
+export default function AdminUsersView({
+  initialUsers,
+  currentUserId,
+}: {
+  initialUsers: UserRow[];
+  currentUserId: string;
+}) {
   const [users, setUsers] = useState(initialUsers);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -19,6 +25,25 @@ export default function AdminUsersView({ initialUsers }: { initialUsers: UserRow
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const adminCount = users.filter((u) => u.role === "ADMIN").length;
+
+  async function handleDelete(u: UserRow) {
+    if (!confirm(`Delete the account for ${u.name} (${u.email})? This can't be undone.`)) return;
+    setError(null);
+    setDeletingId(u.id);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}`, { method: "DELETE" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Failed to delete account");
+      setUsers((prev) => prev.filter((existing) => existing.id !== u.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete account");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -117,22 +142,37 @@ export default function AdminUsersView({ initialUsers }: { initialUsers: UserRow
 
       <div>
         <h2 className="font-medium text-slate-700 mb-2">All Accounts ({users.length})</h2>
+        {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
         <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white overflow-hidden">
-          {users.map((u) => (
-            <li key={u.id} className="flex items-center gap-3 px-4 py-3">
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-slate-800 truncate">{u.name}</p>
-                <p className="text-xs text-slate-500 truncate">{u.email}</p>
-              </div>
-              <span
-                className={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold ${
-                  u.role === "ADMIN" ? "bg-accent/10 text-accent-dark" : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {u.role === "ADMIN" ? "Admin" : "Technician"}
-              </span>
-            </li>
-          ))}
+          {users.map((u) => {
+            const isSelf = u.id === currentUserId;
+            const isLastAdmin = u.role === "ADMIN" && adminCount <= 1;
+            return (
+              <li key={u.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-slate-800 truncate">{u.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                </div>
+                <span
+                  className={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold ${
+                    u.role === "ADMIN" ? "bg-accent/10 text-accent-dark" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {u.role === "ADMIN" ? "Admin" : "Technician"}
+                </span>
+                {!isSelf && !isLastAdmin && (
+                  <button
+                    title="Delete account"
+                    onClick={() => handleDelete(u)}
+                    disabled={deletingId === u.id}
+                    className="shrink-0 rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  >
+                    🗑️
+                  </button>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>

@@ -2,7 +2,7 @@ export type FolderSummary = {
   id: string;
   name: string;
   parentId: string | null;
-  createdById: string;
+  createdById: string | null;
 };
 
 export type FileSummary = {
@@ -12,7 +12,7 @@ export type FileSummary = {
   mimeType: string;
   sizeBytes: number;
   createdAt: string;
-  uploadedById: string;
+  uploadedById: string | null;
   uploadedByName: string;
 };
 
