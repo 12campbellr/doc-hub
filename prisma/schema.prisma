@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL") // pooled connection, used at runtime
+  directUrl = env("POSTGRES_URL_NON_POOLING") // direct connection, used for migrations
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  // Validated as "ADMIN" | "TECHNICIAN" in application code (see src/lib/session.ts).
+  role         String   @default("TECHNICIAN")
+  createdAt    DateTime @default(now())
+
+  foldersCreated Folder[] @relation("FolderCreatedBy")
+  filesUploaded  File[]   @relation("FileUploadedBy")
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  parentId  String?
+  parent    Folder?  @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("FolderChildren")
+  files     File[]
+
+  createdById String
+  createdBy   User   @relation("FolderCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([parentId])
+}
+
+model File {
+  id               String   @id @default(cuid())
+  displayName      String
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+  storagePath      String
+
+  folderId String?
+  folder   Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation("FileUploadedBy", fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([folderId])
+}
