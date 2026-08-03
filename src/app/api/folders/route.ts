@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
+import { logActivity } from "@/lib/activity-log";
 
 /** Flat list of every folder, for the "Move to..." destination picker. */
 export async function GET() {
@@ -37,6 +38,13 @@ export async function POST(req: NextRequest) {
 
     const folder = await prisma.folder.create({
       data: { name, parentId, createdById: user.id },
+    });
+
+    await logActivity({
+      action: "FOLDER_CREATE",
+      targetType: "FOLDER",
+      targetName: folder.name,
+      actorId: user.id,
     });
 
     return NextResponse.json({ folder }, { status: 201 });

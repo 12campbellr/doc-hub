@@ -33,12 +33,20 @@ export default async function Header() {
             Library
           </Link>
           {user.role === "ADMIN" && (
-            <Link
-              href="/admin/users"
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-navy-700 hover:text-white transition-colors"
-            >
-              Users
-            </Link>
+            <>
+              <Link
+                href="/admin/users"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-navy-700 hover:text-white transition-colors"
+              >
+                Users
+              </Link>
+              <Link
+                href="/admin/activity"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-navy-700 hover:text-white transition-colors"
+              >
+                Activity
+              </Link>
+            </>
           )}
           <span className="hidden sm:inline text-sm text-slate-400 px-2">{user.name}</span>
           <SignOutButton />

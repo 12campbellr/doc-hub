@@ -19,7 +19,7 @@ function canManage(currentUser: CurrentUser, ownerId: string | null) {
   return currentUser.role === "ADMIN" || currentUser.id === ownerId;
 }
 
-type MoveTarget = { type: "folder" | "file"; id: string; name: string } | null;
+type ItemRef = { type: "folder" | "file"; id: string; name: string };
 
 export default function LibraryView({
   currentFolderId,
@@ -35,6 +35,7 @@ export default function LibraryView({
   currentUser: CurrentUser;
 }) {
   const router = useRouter();
+  const isAdmin = currentUser.role === "ADMIN";
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
@@ -46,11 +47,15 @@ export default function LibraryView({
     null
   );
 
-  const [moveTarget, setMoveTarget] = useState<MoveTarget>(null);
+  const [moveTargets, setMoveTargets] = useState<ItemRef[] | null>(null);
   const [allFolders, setAllFolders] = useState<{ id: string; name: string; parentId: string | null }[] | null>(
     null
   );
   const [moveDestination, setMoveDestination] = useState<string>("");
+
+  const [selectedFolders, setSelectedFolders] = useState<Set<string>>(new Set());
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const selectedCount = selectedFolders.size + selectedFiles.size;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -156,8 +161,40 @@ export default function LibraryView({
     });
   }
 
-  async function openMoveModal(type: "folder" | "file", id: string, name: string) {
-    setMoveTarget({ type, id, name });
+  function toggleSelected(type: "folder" | "file", id: string) {
+    const set = type === "folder" ? selectedFolders : selectedFiles;
+    const setter = type === "folder" ? setSelectedFolders : setSelectedFiles;
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setter(next);
+  }
+
+  function clearSelection() {
+    setSelectedFolders(new Set());
+    setSelectedFiles(new Set());
+  }
+
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedCount} selected item(s)? This can't be undone.`)) return;
+    await withBusy(async () => {
+      // Files first: if a selected folder is deleted first it cascades its own
+      // files, which would make a separately-selected file 404 unnecessarily.
+      const results = await Promise.allSettled([
+        ...Array.from(selectedFiles).map((id) => apiFetch(`/api/files/${id}`, { method: "DELETE" })),
+        ...Array.from(selectedFolders).map((id) => apiFetch(`/api/folders/${id}`, { method: "DELETE" })),
+      ]);
+      const failed = results.filter((r) => r.status === "rejected").length;
+      clearSelection();
+      refresh();
+      if (failed > 0) {
+        throw new Error(`${failed} of ${selectedCount} item(s) couldn't be deleted`);
+      }
+    });
+  }
+
+  async function openMoveModal(targets: ItemRef[]) {
+    setMoveTargets(targets);
     setMoveDestination("");
     if (!allFolders) {
       const data = await apiFetch("/api/folders");
@@ -168,36 +205,46 @@ export default function LibraryView({
   const folderPaths = useMemo(() => {
     if (!allFolders) return [];
     const byId = new Map(allFolders.map((f) => [f.id, f]));
+    const excludedFolderIds = new Set(
+      (moveTargets ?? []).filter((t) => t.type === "folder").map((t) => t.id)
+    );
     function pathFor(id: string): string {
       const f = byId.get(id);
       if (!f) return "";
       return f.parentId ? `${pathFor(f.parentId)} / ${f.name}` : f.name;
     }
     return allFolders
-      .filter((f) => (moveTarget?.type === "folder" ? f.id !== moveTarget.id : true))
+      .filter((f) => !excludedFolderIds.has(f.id))
       .map((f) => ({ id: f.id, path: pathFor(f.id) }))
       .sort((a, b) => a.path.localeCompare(b.path));
-  }, [allFolders, moveTarget]);
+  }, [allFolders, moveTargets]);
 
   async function confirmMove() {
-    if (!moveTarget) return;
+    if (!moveTargets || moveTargets.length === 0) return;
     const destination = moveDestination || null;
     await withBusy(async () => {
-      if (moveTarget.type === "folder") {
-        await apiFetch(`/api/folders/${moveTarget.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ parentId: destination }),
-        });
-      } else {
-        await apiFetch(`/api/files/${moveTarget.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ folderId: destination }),
-        });
-      }
-      setMoveTarget(null);
+      const results = await Promise.allSettled(
+        moveTargets.map((target) =>
+          target.type === "folder"
+            ? apiFetch(`/api/folders/${target.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ parentId: destination }),
+              })
+            : apiFetch(`/api/files/${target.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ folderId: destination }),
+              })
+        )
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      setMoveTargets(null);
+      clearSelection();
       refresh();
+      if (failed > 0) {
+        throw new Error(`${failed} of ${moveTargets.length} item(s) couldn't be moved`);
+      }
     });
   }
 
@@ -282,6 +329,40 @@ export default function LibraryView({
         </div>
       )}
 
+      {isAdmin && selectedCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-4 bg-accent/10 border border-accent/30 rounded-md p-3">
+          <span className="text-sm font-medium text-navy-900">{selectedCount} selected</span>
+          <button
+            onClick={() => {
+              const targets: ItemRef[] = [
+                ...folders
+                  .filter((f) => selectedFolders.has(f.id))
+                  .map((f) => ({ type: "folder" as const, id: f.id, name: f.name })),
+                ...files
+                  .filter((f) => selectedFiles.has(f.id))
+                  .map((f) => ({ type: "file" as const, id: f.id, name: f.displayName })),
+              ];
+              openMoveModal(targets);
+            }}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+          >
+            Move
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+          >
+            Delete
+          </button>
+          <button
+            onClick={clearSelection}
+            className="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
           {error}
@@ -293,6 +374,15 @@ export default function LibraryView({
         <ul className="mb-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white overflow-hidden">
           {folders.map((folder) => (
             <li key={folder.id} className="flex items-center gap-3 px-4 py-3">
+              {isAdmin && (
+                <input
+                  type="checkbox"
+                  checked={selectedFolders.has(folder.id)}
+                  onChange={() => toggleSelected("folder", folder.id)}
+                  className="shrink-0 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent"
+                  aria-label={`Select ${folder.name}`}
+                />
+              )}
               <span className="text-xl shrink-0" aria-hidden>
                 📁
               </span>
@@ -320,7 +410,7 @@ export default function LibraryView({
                 </button>
                 <button
                   title="Move"
-                  onClick={() => openMoveModal("folder", folder.id, folder.name)}
+                  onClick={() => openMoveModal([{ type: "folder", id: folder.id, name: folder.name }])}
                   className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                 >
                   📦
@@ -348,6 +438,15 @@ export default function LibraryView({
             const style = FILE_KIND_STYLES[kind];
             return (
               <li key={file.id} className="flex items-center gap-3 px-4 py-3">
+                {isAdmin && (
+                  <input
+                    type="checkbox"
+                    checked={selectedFiles.has(file.id)}
+                    onChange={() => toggleSelected("file", file.id)}
+                    className="shrink-0 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent"
+                    aria-label={`Select ${file.displayName}`}
+                  />
+                )}
                 <span
                   className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${style.className}`}
                 >
@@ -391,7 +490,7 @@ export default function LibraryView({
                   </button>
                   <button
                     title="Move"
-                    onClick={() => openMoveModal("file", file.id, file.displayName)}
+                    onClick={() => openMoveModal([{ type: "file", id: file.id, name: file.displayName }])}
                     className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                   >
                     📦
@@ -426,10 +525,12 @@ export default function LibraryView({
       )}
 
       {/* Move modal */}
-      {moveTarget && (
+      {moveTargets && moveTargets.length > 0 && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-            <h2 className="text-base font-semibold text-slate-800 mb-1">Move "{moveTarget.name}"</h2>
+            <h2 className="text-base font-semibold text-slate-800 mb-1">
+              {moveTargets.length === 1 ? `Move "${moveTargets[0].name}"` : `Move ${moveTargets.length} items`}
+            </h2>
             <p className="text-sm text-slate-500 mb-3">Choose a destination folder.</p>
             <select
               value={moveDestination}
@@ -445,7 +546,7 @@ export default function LibraryView({
             </select>
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setMoveTarget(null)}
+                onClick={() => setMoveTargets(null)}
                 className="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100"
               >
                 Cancel

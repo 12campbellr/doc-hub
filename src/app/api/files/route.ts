@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
 import { saveFile, sanitizeFilename, MAX_FILE_SIZE_BYTES } from "@/lib/storage";
+import { logActivity } from "@/lib/activity-log";
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,6 +48,13 @@ export async function POST(req: NextRequest) {
         folderId,
         uploadedById: user.id,
       },
+    });
+
+    await logActivity({
+      action: "FILE_UPLOAD",
+      targetType: "FILE",
+      targetName: record.displayName,
+      actorId: user.id,
     });
 
     return NextResponse.json({ file: record }, { status: 201 });

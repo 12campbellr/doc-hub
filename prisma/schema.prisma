@@ -17,8 +17,9 @@ model User {
   role         String   @default("TECHNICIAN")
   createdAt    DateTime @default(now())
 
-  foldersCreated Folder[] @relation("FolderCreatedBy")
-  filesUploaded  File[]   @relation("FileUploadedBy")
+  foldersCreated Folder[]       @relation("FolderCreatedBy")
+  filesUploaded  File[]         @relation("FileUploadedBy")
+  activityLogs   ActivityLog[]  @relation("ActivityLogActor")
 }
 
 model Folder {
@@ -54,4 +55,23 @@ model File {
   createdAt DateTime @default(now())
 
   @@index([folderId])
+}
+
+model ActivityLog {
+  id String @id @default(cuid())
+
+  // e.g. "FOLDER_CREATE" | "FOLDER_RENAME" | "FOLDER_MOVE" | "FOLDER_DELETE"
+  // | "FILE_UPLOAD" | "FILE_RENAME" | "FILE_MOVE" | "FILE_DELETE"
+  // | "USER_CREATE" | "USER_DELETE" — validated in application code (see src/lib/activity-log.ts)
+  action     String
+  targetType String
+  targetName String
+  details    String?
+
+  actorId String?
+  actor   User?   @relation("ActivityLogActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

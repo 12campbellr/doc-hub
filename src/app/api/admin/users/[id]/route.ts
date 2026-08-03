@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
+import { logActivity } from "@/lib/activity-log";
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -26,6 +27,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
     // Folders/files this user created keep existing (shared library) via onDelete: SetNull.
     await prisma.user.delete({ where: { id } });
+
+    await logActivity({
+      action: "USER_DELETE",
+      targetType: "USER",
+      targetName: target.name,
+      details: target.email,
+      actorId: admin.id,
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

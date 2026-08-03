@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET() {
   try {
@@ -19,7 +20,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    const admin = await requireAdmin();
     const body = await req.json();
 
     const name = (body?.name ?? "").toString().trim();
@@ -43,6 +44,14 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.create({
       data: { name, email, passwordHash, role },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
+    });
+
+    await logActivity({
+      action: "USER_CREATE",
+      targetType: "USER",
+      targetName: user.name,
+      details: user.email,
+      actorId: admin.id,
     });
 
     return NextResponse.json({ user }, { status: 201 });

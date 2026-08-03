@@ -3,10 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, ForbiddenError } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
 import { isDescendantOf, getSubtreeFolderIds } from "@/lib/folders";
+import { logActivity } from "@/lib/activity-log";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireUser();
+    const user = await requireUser();
     const { id } = await params;
     const folder = await prisma.folder.findUnique({ where: { id } });
     if (!folder) {
@@ -15,6 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const body = await req.json();
     const data: { name?: string; parentId?: string | null } = {};
+    let destinationName: string | null = null;
 
     if (typeof body?.name === "string") {
       const name = body.name.trim();
@@ -41,11 +43,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             { status: 400 }
           );
         }
+        destinationName = parent.name;
+      } else {
+        destinationName = "Home";
       }
       data.parentId = newParentId;
     }
 
     const updated = await prisma.folder.update({ where: { id: folder.id }, data });
+
+    if (data.name) {
+      await logActivity({
+        action: "FOLDER_RENAME",
+        targetType: "FOLDER",
+        targetName: updated.name,
+        details: `renamed "${folder.name}" to "${updated.name}"`,
+        actorId: user.id,
+      });
+    }
+    if (destinationName) {
+      await logActivity({
+        action: "FOLDER_MOVE",
+        targetType: "FOLDER",
+        targetName: updated.name,
+        details: `moved to "${destinationName}"`,
+        actorId: user.id,
+      });
+    }
+
     return NextResponse.json({ folder: updated });
   } catch (err) {
     return handleApiError(err);
@@ -71,6 +96,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     await Promise.all(filesInside.map((f) => deleteFile(f.storagePath).catch(() => undefined)));
 
     await prisma.folder.delete({ where: { id: folder.id } });
+
+    await logActivity({
+      action: "FOLDER_DELETE",
+      targetType: "FOLDER",
+      targetName: folder.name,
+      actorId: user.id,
+    });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);
