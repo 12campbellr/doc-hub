@@ -8,7 +8,7 @@ export default async function FolderPage({ params }: { params: Promise<{ id: str
   if (!user) return null;
 
   const { id } = await params;
-  const data = await getLibraryData(id);
+  const data = await getLibraryData(id, user.id);
   if (!data) notFound();
 
   return (
@@ -18,6 +18,8 @@ export default async function FolderPage({ params }: { params: Promise<{ id: str
       folders={data.folders}
       files={data.files}
       currentUser={user}
+      favoriteFolderIds={data.favoriteFolderIds}
+      favoriteFileIds={data.favoriteFileIds}
     />
   );
 }

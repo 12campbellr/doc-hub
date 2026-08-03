@@ -6,7 +6,7 @@ export default async function HomePage() {
   const user = await getCurrentUser();
   if (!user) return null; // middleware redirects unauthenticated requests before this renders
 
-  const data = await getLibraryData(null);
+  const data = await getLibraryData(null, user.id);
   if (!data) return null;
 
   return (
@@ -16,6 +16,8 @@ export default async function HomePage() {
       folders={data.folders}
       files={data.files}
       currentUser={user}
+      favoriteFolderIds={data.favoriteFolderIds}
+      favoriteFileIds={data.favoriteFileIds}
     />
   );
 }

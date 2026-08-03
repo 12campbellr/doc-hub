@@ -2,15 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { searchLibrary } from "@/lib/search";
 import { formatBytes, getFileKind, FILE_KIND_STYLES } from "@/lib/format";
-import type { Crumb } from "@/lib/folders";
-
-function BreadcrumbPath({ crumbs }: { crumbs: Crumb[] }) {
-  return (
-    <p className="text-xs text-slate-400 truncate">
-      Home{crumbs.map((c) => ` / ${c.name}`).join("")}
-    </p>
-  );
-}
+import BreadcrumbPath from "@/components/BreadcrumbPath";
 
 export default async function SearchPage({
   searchParams,

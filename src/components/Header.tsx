@@ -32,6 +32,12 @@ export default async function Header() {
           >
             Library
           </Link>
+          <Link
+            href="/favorites"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-navy-700 hover:text-white transition-colors"
+          >
+            Favorites
+          </Link>
           {user.role === "ADMIN" && (
             <>
               <Link

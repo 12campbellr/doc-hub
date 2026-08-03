@@ -20,6 +20,7 @@ model User {
   foldersCreated Folder[]       @relation("FolderCreatedBy")
   filesUploaded  File[]         @relation("FileUploadedBy")
   activityLogs   ActivityLog[]  @relation("ActivityLogActor")
+  favorites      Favorite[]
 }
 
 model Folder {
@@ -34,6 +35,8 @@ model Folder {
   createdBy   User?   @relation("FolderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
+
+  favoritedBy Favorite[]
 
   @@index([parentId])
 }
@@ -54,7 +57,29 @@ model File {
 
   createdAt DateTime @default(now())
 
+  favoritedBy Favorite[]
+
   @@index([folderId])
+}
+
+model Favorite {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Exactly one of folderId/fileId is set — validated in application code
+  // (see src/app/api/favorites/route.ts).
+  folderId String?
+  folder   Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  fileId String?
+  file   File?   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, folderId])
+  @@unique([userId, fileId])
+  @@index([userId])
 }
 
 model ActivityLog {

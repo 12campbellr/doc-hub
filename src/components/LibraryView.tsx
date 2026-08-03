@@ -27,15 +27,21 @@ export default function LibraryView({
   folders,
   files,
   currentUser,
+  favoriteFolderIds,
+  favoriteFileIds,
 }: {
   currentFolderId: string | null;
   breadcrumb: Crumb[];
   folders: FolderSummary[];
   files: FileSummary[];
   currentUser: CurrentUser;
+  favoriteFolderIds: string[];
+  favoriteFileIds: string[];
 }) {
   const router = useRouter();
   const isAdmin = currentUser.role === "ADMIN";
+  const [favFolders, setFavFolders] = useState<Set<string>>(new Set(favoriteFolderIds));
+  const [favFiles, setFavFiles] = useState<Set<string>>(new Set(favoriteFileIds));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
@@ -201,6 +207,31 @@ export default function LibraryView({
   function clearSelection() {
     setSelectedFolders(new Set());
     setSelectedFiles(new Set());
+  }
+
+  async function toggleFavorite(type: "folder" | "file", id: string) {
+    const set = type === "folder" ? favFolders : favFiles;
+    const setter = type === "folder" ? setFavFolders : setFavFiles;
+    const wasFavorited = set.has(id);
+
+    // Optimistic update — favoriting should feel instant, not wait on a round trip.
+    const next = new Set(set);
+    if (wasFavorited) next.delete(id);
+    else next.add(id);
+    setter(next);
+
+    try {
+      await apiFetch("/api/favorites", {
+        method: wasFavorited ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetType: type === "folder" ? "FOLDER" : "FILE", targetId: id }),
+      });
+    } catch (err) {
+      // Revert on failure.
+      const reverted = new Set(set);
+      setter(reverted);
+      setError(err instanceof Error ? err.message : "Couldn't update favorite");
+    }
   }
 
   async function handleBulkDelete() {
@@ -447,6 +478,13 @@ export default function LibraryView({
               )}
               <div className="flex items-center gap-1 shrink-0">
                 <button
+                  title={favFolders.has(folder.id) ? "Remove from favorites" : "Add to favorites"}
+                  onClick={() => toggleFavorite("folder", folder.id)}
+                  className="rounded p-1.5 text-amber-400 hover:bg-slate-100"
+                >
+                  {favFolders.has(folder.id) ? "⭐" : "☆"}
+                </button>
+                <button
                   title="Rename"
                   onClick={() => startEditing("folder", folder.id, folder.name)}
                   className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
@@ -526,6 +564,13 @@ export default function LibraryView({
                 </span>
 
                 <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    title={favFiles.has(file.id) ? "Remove from favorites" : "Add to favorites"}
+                    onClick={() => toggleFavorite("file", file.id)}
+                    className="rounded p-1.5 text-amber-400 hover:bg-slate-100"
+                  >
+                    {favFiles.has(file.id) ? "⭐" : "☆"}
+                  </button>
                   <button
                     title="Rename"
                     onClick={() => startEditing("file", file.id, file.displayName)}
