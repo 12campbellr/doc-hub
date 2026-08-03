@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type DragEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Crumb, CurrentUser, FileSummary, FolderSummary } from "@/lib/types";
@@ -56,6 +56,9 @@ export default function LibraryView({
   const [selectedFolders, setSelectedFolders] = useState<Set<string>>(new Set());
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const selectedCount = selectedFolders.size + selectedFiles.size;
+
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounterRef = useRef(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +116,31 @@ export default function LibraryView({
       if (fileInputRef.current) fileInputRef.current.value = "";
       if (photoInputRef.current) photoInputRef.current.value = "";
     }
+  }
+
+  function handleDragEnter(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    if (!e.dataTransfer.types.includes("Files")) return;
+    dragCounterRef.current += 1;
+    setIsDraggingOver(true);
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    // Required for onDrop to fire at all.
+    e.preventDefault();
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) setIsDraggingOver(false);
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDraggingOver(false);
+    if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files);
   }
 
   function startEditing(type: "folder" | "file", id: string, currentName: string) {
@@ -249,7 +277,24 @@ export default function LibraryView({
   }
 
   return (
-    <div>
+    <div
+      className="relative"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingOver && (
+        <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center bg-navy-950/40">
+          <div className="rounded-xl border-4 border-dashed border-accent bg-white px-8 py-6 text-center shadow-xl">
+            <p className="text-lg font-semibold text-slate-800">Drop to upload</p>
+            <p className="text-sm text-slate-500">
+              {currentFolderId ? "Files will be added to this folder" : "Files will be added to Home"}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <nav className="flex flex-wrap items-center gap-1 text-sm text-slate-500 mb-4">
         <Link href="/" className="hover:text-accent-dark font-medium">
