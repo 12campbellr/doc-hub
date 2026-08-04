@@ -30,6 +30,7 @@ Change this immediately: create your own admin account from **Users** in the top
 - Separate login per technician; admins create accounts from **Users** (no public sign-up)
 - Shared folder tree: create folders, upload files/photos (including directly from a phone camera), rename, move, delete
 - Delete is restricted to admins or whoever uploaded/created the item
+- Select multiple files/folders and download them as a single ZIP (folder structure preserved)
 - Mobile-responsive layout; "Add to Home Screen" support via the PWA manifest
 
 ## Project layout

@@ -253,6 +253,42 @@ export default function LibraryView({
     });
   }
 
+  async function handleBulkDownload() {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/files/download-zip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileIds: Array.from(selectedFiles),
+          folderIds: Array.from(selectedFolders),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Download failed (${res.status})`);
+      }
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match ? decodeURIComponent(match[1]) : "dochub-download.zip";
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Download failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function openMoveModal(targets: ItemRef[]) {
     setMoveTargets(targets);
     setMoveDestination("");
@@ -406,31 +442,42 @@ export default function LibraryView({
         </div>
       )}
 
-      {isAdmin && selectedCount > 0 && (
+      {selectedCount > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-4 bg-accent/10 border border-accent/30 rounded-md p-3">
           <span className="text-sm font-medium text-navy-900">{selectedCount} selected</span>
           <button
-            onClick={() => {
-              const targets: ItemRef[] = [
-                ...folders
-                  .filter((f) => selectedFolders.has(f.id))
-                  .map((f) => ({ type: "folder" as const, id: f.id, name: f.name })),
-                ...files
-                  .filter((f) => selectedFiles.has(f.id))
-                  .map((f) => ({ type: "file" as const, id: f.id, name: f.displayName })),
-              ];
-              openMoveModal(targets);
-            }}
+            onClick={handleBulkDownload}
+            disabled={busy}
             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
           >
-            Move
+            Download as ZIP
           </button>
-          <button
-            onClick={handleBulkDelete}
-            className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
-            Delete
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                const targets: ItemRef[] = [
+                  ...folders
+                    .filter((f) => selectedFolders.has(f.id))
+                    .map((f) => ({ type: "folder" as const, id: f.id, name: f.name })),
+                  ...files
+                    .filter((f) => selectedFiles.has(f.id))
+                    .map((f) => ({ type: "file" as const, id: f.id, name: f.displayName })),
+                ];
+                openMoveModal(targets);
+              }}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+            >
+              Move
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={handleBulkDelete}
+              className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              Delete
+            </button>
+          )}
           <button
             onClick={clearSelection}
             className="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100"
@@ -451,15 +498,13 @@ export default function LibraryView({
         <ul className="mb-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white overflow-hidden">
           {folders.map((folder) => (
             <li key={folder.id} className="flex items-center gap-3 px-4 py-3">
-              {isAdmin && (
-                <input
-                  type="checkbox"
-                  checked={selectedFolders.has(folder.id)}
-                  onChange={() => toggleSelected("folder", folder.id)}
-                  className="shrink-0 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent"
-                  aria-label={`Select ${folder.name}`}
-                />
-              )}
+              <input
+                type="checkbox"
+                checked={selectedFolders.has(folder.id)}
+                onChange={() => toggleSelected("folder", folder.id)}
+                className="shrink-0 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent"
+                aria-label={`Select ${folder.name}`}
+              />
               <span className="text-xl shrink-0" aria-hidden>
                 📁
               </span>
@@ -520,15 +565,13 @@ export default function LibraryView({
           {files.map((file) => {
             return (
               <li key={file.id} className="flex items-center gap-3 px-4 py-3">
-                {isAdmin && (
-                  <input
-                    type="checkbox"
-                    checked={selectedFiles.has(file.id)}
-                    onChange={() => toggleSelected("file", file.id)}
-                    className="shrink-0 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent"
-                    aria-label={`Select ${file.displayName}`}
-                  />
-                )}
+                <input
+                  type="checkbox"
+                  checked={selectedFiles.has(file.id)}
+                  onChange={() => toggleSelected("file", file.id)}
+                  className="shrink-0 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent"
+                  aria-label={`Select ${file.displayName}`}
+                />
                 <FileTypeIcon fileId={file.id} mimeType={file.mimeType} />
 
                 {editing?.type === "file" && editing.id === file.id ? (

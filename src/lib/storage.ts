@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { put, del, get } from "@vercel/blob";
 
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+export const MAX_ZIP_DOWNLOAD_BYTES = 500 * 1024 * 1024; // 500MB combined, per bulk zip download
 
 /** Strips path separators and control characters so a filename is safe to keep for display/extension purposes. */
 export function sanitizeFilename(name: string): string {
