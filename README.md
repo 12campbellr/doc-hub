@@ -34,6 +34,7 @@ Change this immediately: create your own admin account from **Users** in the top
 - New accounts must set their own password on first login
 - Admins can restrict a folder (and everything inside it) to one or more groups; manage groups and group membership from **Groups**/**Users**
 - Folders and files can be tagged from an admin-managed tag list (**Tags**); admins and owners apply tags from the library
+- Search can filter by file type, tag, and folder scope, and paginates document results
 - Mobile-responsive layout; "Add to Home Screen" support via the PWA manifest
 
 ## Project layout
