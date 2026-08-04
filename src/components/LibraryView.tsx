@@ -60,6 +60,10 @@ export default function LibraryView({
   );
   const [moveDestination, setMoveDestination] = useState<string>("");
 
+  const [restrictingFolder, setRestrictingFolder] = useState<FolderSummary | null>(null);
+  const [allGroups, setAllGroups] = useState<{ id: string; name: string }[] | null>(null);
+  const [restrictionGroupIds, setRestrictionGroupIds] = useState<Set<string>>(new Set());
+
   const [selectedFolders, setSelectedFolders] = useState<Set<string>>(new Set());
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const selectedCount = selectedFolders.size + selectedFiles.size;
@@ -287,6 +291,37 @@ export default function LibraryView({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function openRestrictionModal(folder: FolderSummary) {
+    setRestrictingFolder(folder);
+    setRestrictionGroupIds(new Set(folder.restrictedGroupIds));
+    if (!allGroups) {
+      const data = await apiFetch("/api/admin/groups");
+      setAllGroups(data.groups);
+    }
+  }
+
+  function toggleRestrictionGroup(groupId: string) {
+    setRestrictionGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
+  async function confirmRestriction() {
+    if (!restrictingFolder) return;
+    await withBusy(async () => {
+      await apiFetch(`/api/folders/${restrictingFolder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupIds: Array.from(restrictionGroupIds) }),
+      });
+      setRestrictingFolder(null);
+      refresh();
+    });
   }
 
   async function openMoveModal(targets: ItemRef[]) {
@@ -518,8 +553,13 @@ export default function LibraryView({
                   className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm"
                 />
               ) : (
-                <Link href={`/folder/${folder.id}`} className="flex-1 font-medium text-slate-800 hover:text-accent-dark">
-                  {folder.name}
+                <Link href={`/folder/${folder.id}`} className="flex-1 min-w-0 flex items-center gap-1.5 font-medium text-slate-800 hover:text-accent-dark">
+                  <span className="truncate">{folder.name}</span>
+                  {folder.restrictedGroupIds.length > 0 && (
+                    <span title="Restricted to specific groups" aria-hidden className="shrink-0 text-sm">
+                      🔒
+                    </span>
+                  )}
                 </Link>
               )}
               <div className="flex items-center gap-1 shrink-0">
@@ -544,6 +584,15 @@ export default function LibraryView({
                 >
                   📦
                 </button>
+                {isAdmin && (
+                  <button
+                    title="Restrict access"
+                    onClick={() => openRestrictionModal(folder)}
+                    className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    🔒
+                  </button>
+                )}
                 {canManage(currentUser, folder.createdById) && (
                   <button
                     title="Delete"
@@ -685,6 +734,57 @@ export default function LibraryView({
                 className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-dark"
               >
                 Move
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Folder restriction modal */}
+      {restrictingFolder && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+            <h2 className="text-base font-semibold text-slate-800 mb-1">
+              Restrict &ldquo;{restrictingFolder.name}&rdquo;
+            </h2>
+            <p className="text-sm text-slate-500 mb-3">
+              Only members of the checked groups (plus admins) will be able to see this folder and
+              everything inside it. Leave everything unchecked to make it visible to everyone.
+            </p>
+            {allGroups === null ? (
+              <p className="text-sm text-slate-500 mb-4">Loading groups…</p>
+            ) : allGroups.length === 0 ? (
+              <p className="text-sm text-slate-500 mb-4">
+                No groups exist yet — create one from the Groups admin page first.
+              </p>
+            ) : (
+              <div className="mb-4 space-y-2 max-h-48 overflow-y-auto">
+                {allGroups.map((g) => (
+                  <label key={g.id} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={restrictionGroupIds.has(g.id)}
+                      onChange={() => toggleRestrictionGroup(g.id)}
+                      className="h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent"
+                    />
+                    {g.name}
+                  </label>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setRestrictingFolder(null)}
+                className="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRestriction}
+                disabled={busy}
+                className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-dark"
+              >
+                Save
               </button>
             </div>
           </div>

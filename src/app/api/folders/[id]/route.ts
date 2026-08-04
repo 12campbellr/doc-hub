@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, ForbiddenError } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
 import { isDescendantOf, getSubtreeFolderIds } from "@/lib/folders";
+import { canUserAccessFolder } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -10,13 +11,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const user = await requireUser();
     const { id } = await params;
     const folder = await prisma.folder.findUnique({ where: { id } });
-    if (!folder) {
+    if (!folder || !(await canUserAccessFolder(user, id))) {
       return NextResponse.json({ error: "Folder not found" }, { status: 404 });
     }
 
     const body = await req.json();
-    const data: { name?: string; parentId?: string | null } = {};
+    const data: {
+      name?: string;
+      parentId?: string | null;
+      restrictedByGroups?: { set: { id: string }[] };
+    } = {};
     let destinationName: string | null = null;
+    let restrictionChanged = false;
 
     if (typeof body?.name === "string") {
       const name = body.name.trim();
@@ -34,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       if (newParentId) {
         const parent = await prisma.folder.findUnique({ where: { id: newParentId } });
-        if (!parent) {
+        if (!parent || !(await canUserAccessFolder(user, newParentId))) {
           return NextResponse.json({ error: "Destination folder not found" }, { status: 404 });
         }
         if (await isDescendantOf(newParentId, folder.id)) {
@@ -48,6 +54,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         destinationName = "Home";
       }
       data.parentId = newParentId;
+    }
+
+    if ("groupIds" in body) {
+      if (user.role !== "ADMIN") {
+        throw new ForbiddenError("Only an admin can change folder access restrictions");
+      }
+      const groupIds: string[] = Array.isArray(body.groupIds) ? body.groupIds.map(String) : [];
+      data.restrictedByGroups = { set: groupIds.map((groupId) => ({ id: groupId })) };
+      restrictionChanged = true;
     }
 
     const updated = await prisma.folder.update({ where: { id: folder.id }, data });
@@ -70,6 +85,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         actorId: user.id,
       });
     }
+    if (restrictionChanged) {
+      await logActivity({
+        action: "FOLDER_RESTRICT",
+        targetType: "FOLDER",
+        targetName: updated.name,
+        details:
+          data.restrictedByGroups!.set.length > 0
+            ? `restricted to ${data.restrictedByGroups!.set.length} group(s)`
+            : "restriction removed",
+        actorId: user.id,
+      });
+    }
 
     return NextResponse.json({ folder: updated });
   } catch (err) {
@@ -82,7 +109,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const user = await requireUser();
     const { id } = await params;
     const folder = await prisma.folder.findUnique({ where: { id } });
-    if (!folder) {
+    if (!folder || !(await canUserAccessFolder(user, id))) {
       return NextResponse.json({ error: "Folder not found" }, { status: 404 });
     }
     if (user.role !== "ADMIN" && folder.createdById !== user.id) {

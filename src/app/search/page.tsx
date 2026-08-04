@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { searchLibrary } from "@/lib/search";
+import { getVisibleFolderIds } from "@/lib/permissions";
 import { formatBytes } from "@/lib/format";
 import BreadcrumbPath from "@/components/BreadcrumbPath";
 import FileTypeIcon from "@/components/FileTypeIcon";
@@ -24,7 +25,8 @@ export default async function SearchPage({
     );
   }
 
-  const { folders, files } = await searchLibrary(query);
+  const visibleFolderIds = await getVisibleFolderIds(user);
+  const { folders, files } = await searchLibrary(query, visibleFolderIds);
   const hasResults = folders.length > 0 || files.length > 0;
 
   return (

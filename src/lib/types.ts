@@ -3,6 +3,9 @@ export type FolderSummary = {
   name: string;
   parentId: string | null;
   createdById: string | null;
+  /** Group ids this folder is directly restricted to (empty = unrestricted). Does not
+   *  include restrictions inherited from an ancestor folder. */
+  restrictedGroupIds: string[];
 };
 
 export type FileSummary = {

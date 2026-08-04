@@ -3,12 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
 import { logActivity } from "@/lib/activity-log";
+import { canUserAccessFolder, getVisibleFolderIds } from "@/lib/permissions";
 
 /** Flat list of every folder, for the "Move to..." destination picker. */
 export async function GET() {
   try {
-    await requireUser();
+    const user = await requireUser();
+    const visibleFolderIds = await getVisibleFolderIds(user);
     const folders = await prisma.folder.findMany({
+      where: visibleFolderIds ? { id: { in: Array.from(visibleFolderIds) } } : {},
       orderBy: { name: "asc" },
       select: { id: true, name: true, parentId: true },
     });
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     if (parentId) {
       const parent = await prisma.folder.findUnique({ where: { id: parentId } });
-      if (!parent) {
+      if (!parent || !(await canUserAccessFolder(user, parentId))) {
         return NextResponse.json({ error: "Parent folder not found" }, { status: 404 });
       }
     }

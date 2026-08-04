@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
 import { readFile } from "@/lib/storage";
+import { canUserAccessFolder } from "@/lib/permissions";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireUser();
+    const user = await requireUser();
     const { id } = await params;
     const file = await prisma.file.findUnique({ where: { id } });
-    if (!file) {
+    if (!file || !(await canUserAccessFolder(user, file.folderId))) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 

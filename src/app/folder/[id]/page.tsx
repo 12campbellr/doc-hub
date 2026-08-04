@@ -8,7 +8,7 @@ export default async function FolderPage({ params }: { params: Promise<{ id: str
   if (!user) return null;
 
   const { id } = await params;
-  const data = await getLibraryData(id, user.id);
+  const data = await getLibraryData(id, user);
   if (!data) notFound();
 
   return (

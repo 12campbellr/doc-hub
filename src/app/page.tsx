@@ -6,7 +6,7 @@ export default async function HomePage() {
   const user = await getCurrentUser();
   if (!user) return null; // middleware redirects unauthenticated requests before this renders
 
-  const data = await getLibraryData(null, user.id);
+  const data = await getLibraryData(null, user);
   if (!data) return null;
 
   return (

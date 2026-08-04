@@ -9,6 +9,7 @@ const TARGET_ICON: Record<string, string> = {
   FOLDER: "📁",
   FILE: "📄",
   USER: "👤",
+  GROUP: "👥",
 };
 
 export default async function ActivityLogPage() {

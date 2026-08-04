@@ -6,7 +6,7 @@ export default async function FavoritesPage() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const { folders, files } = await getFavorites(user.id);
+  const { folders, files } = await getFavorites(user);
 
   return <FavoritesView initialFolders={folders} initialFiles={files} />;
 }

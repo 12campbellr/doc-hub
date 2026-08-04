@@ -1,14 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { getBreadcrumb } from "@/lib/folders";
+import { canUserAccessFolder } from "@/lib/permissions";
+import type { SessionUser } from "@/lib/session";
 import type { FileSummary, FolderSummary } from "@/lib/types";
 
-export async function getLibraryData(folderId: string | null, userId: string) {
-  const [folder, breadcrumb, folders, files] = await Promise.all([
+export async function getLibraryData(folderId: string | null, user: SessionUser) {
+  const [folder, breadcrumb, allChildFolders, files] = await Promise.all([
     folderId ? prisma.folder.findUnique({ where: { id: folderId } }) : Promise.resolve(null),
     getBreadcrumb(folderId),
     prisma.folder.findMany({
       where: { parentId: folderId },
       orderBy: { name: "asc" },
+      include: { restrictedByGroups: { select: { id: true } } },
     }),
     prisma.file.findMany({
       where: { folderId },
@@ -17,13 +20,26 @@ export async function getLibraryData(folderId: string | null, userId: string) {
     }),
   ]);
 
-  if (folderId && !folder) {
+  // Same "not found" shape for a nonexistent folder and one the caller can't see —
+  // a distinguishable response would leak the restricted folder's existence.
+  if (folderId && (!folder || !(await canUserAccessFolder(user, folderId)))) {
     return null;
   }
 
+  // Subfolders can carry a stricter restriction than the folder being viewed, so each
+  // is checked individually rather than inheriting the parent's already-established access.
+  const folders =
+    user.role === "ADMIN"
+      ? allChildFolders
+      : (
+          await Promise.all(
+            allChildFolders.map(async (f) => ((await canUserAccessFolder(user, f.id)) ? f : null))
+          )
+        ).filter((f): f is NonNullable<typeof f> => f !== null);
+
   const favorites = await prisma.favorite.findMany({
     where: {
-      userId,
+      userId: user.id,
       OR: [
         { folderId: { in: folders.map((f) => f.id) } },
         { fileId: { in: files.map((f) => f.id) } },
@@ -39,6 +55,7 @@ export async function getLibraryData(folderId: string | null, userId: string) {
     name: f.name,
     parentId: f.parentId,
     createdById: f.createdById,
+    restrictedGroupIds: f.restrictedByGroups.map((g) => g.id),
   }));
 
   const fileSummaries: FileSummary[] = files.map((f) => ({

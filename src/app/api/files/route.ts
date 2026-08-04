@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
 import { saveFile, sanitizeFilename, MAX_FILE_SIZE_BYTES } from "@/lib/storage";
+import { canUserAccessFolder } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 
 export async function POST(req: NextRequest) {
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
     const folderId = folderIdRaw ? String(folderIdRaw) : null;
     if (folderId) {
       const folder = await prisma.folder.findUnique({ where: { id: folderId } });
-      if (!folder) {
+      if (!folder || !(await canUserAccessFolder(user, folderId))) {
         return NextResponse.json({ error: "Folder not found" }, { status: 404 });
       }
     }

@@ -22,16 +22,26 @@ export type FileSearchResult = {
 };
 
 export async function searchLibrary(
-  query: string
+  query: string,
+  /** null = no restriction filtering needed (admin, or nothing is restricted). */
+  visibleFolderIds?: Set<string> | null
 ): Promise<{ folders: FolderSearchResult[]; files: FileSearchResult[] }> {
   const [matchedFolders, matchedFiles] = await Promise.all([
     prisma.folder.findMany({
-      where: { name: { contains: query, mode: "insensitive" } },
+      where: {
+        name: { contains: query, mode: "insensitive" },
+        ...(visibleFolderIds ? { id: { in: Array.from(visibleFolderIds) } } : {}),
+      },
       orderBy: { name: "asc" },
       take: RESULT_LIMIT,
     }),
     prisma.file.findMany({
-      where: { displayName: { contains: query, mode: "insensitive" } },
+      where: {
+        displayName: { contains: query, mode: "insensitive" },
+        ...(visibleFolderIds
+          ? { OR: [{ folderId: null }, { folderId: { in: Array.from(visibleFolderIds) } }] }
+          : {}),
+      },
       orderBy: { displayName: "asc" },
       take: RESULT_LIMIT,
       include: { uploadedBy: { select: { name: true } } },

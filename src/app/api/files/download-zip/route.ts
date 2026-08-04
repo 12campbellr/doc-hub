@@ -6,6 +6,7 @@ import { handleApiError } from "@/lib/api-helpers";
 import { readFile, MAX_ZIP_DOWNLOAD_BYTES } from "@/lib/storage";
 import { formatBytes } from "@/lib/format";
 import { getSubtreeFolderIds } from "@/lib/folders";
+import { getVisibleFolderIds } from "@/lib/permissions";
 
 type FileRecord = { id: string; displayName: string; storagePath: string; sizeBytes: number };
 
@@ -38,11 +39,12 @@ function uniquePath(path: string, used: Set<string>): string {
 /**
  * Bulk-download endpoint: bundles selected files and folders (recursively) into a
  * single zip. Any signed-in user may call this — it's a read-only aggregation of
- * files they could already download individually.
+ * files they could already download individually. Group-restricted folders/files the
+ * caller can't see are silently dropped from the selection rather than erroring.
  */
 export async function POST(req: NextRequest) {
   try {
-    await requireUser();
+    const user = await requireUser();
     const body = await req.json().catch(() => ({}));
     const fileIds: string[] = Array.isArray(body?.fileIds) ? body.fileIds.map(String) : [];
     const folderIds: string[] = Array.isArray(body?.folderIds) ? body.folderIds.map(String) : [];
@@ -51,11 +53,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nothing selected" }, { status: 400 });
     }
 
+    // null = no restriction filtering needed (admin, or nothing is restricted).
+    const visibleFolderIds = await getVisibleFolderIds(user);
+    const isVisible = (folderId: string | null) =>
+      !visibleFolderIds || folderId === null || visibleFolderIds.has(folderId);
+
     const usedPaths = new Set<string>();
     const includedIds = new Set<string>();
     const entries: { file: FileRecord; path: string }[] = [];
 
-    const selectedFolders = await prisma.folder.findMany({ where: { id: { in: folderIds } } });
+    const selectedFolders = (
+      await prisma.folder.findMany({ where: { id: { in: folderIds } } })
+    ).filter((f) => isVisible(f.id));
 
     for (const root of selectedFolders) {
       const subtreeIds = await getSubtreeFolderIds(root.id);
@@ -79,7 +88,9 @@ export async function POST(req: NextRequest) {
         return chain;
       };
 
-      const filesInSubtree = await prisma.file.findMany({ where: { folderId: { in: subtreeIds } } });
+      const filesInSubtree = await prisma.file.findMany({
+        where: { folderId: { in: subtreeIds.filter((id) => isVisible(id)) } },
+      });
       for (const file of filesInSubtree) {
         if (includedIds.has(file.id)) continue;
         includedIds.add(file.id);
@@ -91,7 +102,9 @@ export async function POST(req: NextRequest) {
 
     const remainingFileIds = fileIds.filter((id) => !includedIds.has(id));
     if (remainingFileIds.length > 0) {
-      const looseFiles = await prisma.file.findMany({ where: { id: { in: remainingFileIds } } });
+      const looseFiles = (
+        await prisma.file.findMany({ where: { id: { in: remainingFileIds } } })
+      ).filter((f) => isVisible(f.folderId));
       for (const file of looseFiles) {
         includedIds.add(file.id);
         const path = uniquePath(sanitizeSegment(file.displayName), usedPaths);

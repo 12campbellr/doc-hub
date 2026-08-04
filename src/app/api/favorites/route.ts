@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
+import { canUserAccessFolder } from "@/lib/permissions";
 
 function parseTarget(body: any): { targetType: "FOLDER" | "FILE"; targetId: string } | null {
   const targetType = body?.targetType === "FOLDER" || body?.targetType === "FILE" ? body.targetType : null;
@@ -20,10 +21,14 @@ export async function POST(req: NextRequest) {
 
     if (target.targetType === "FOLDER") {
       const folder = await prisma.folder.findUnique({ where: { id: target.targetId } });
-      if (!folder) return NextResponse.json({ error: "Folder not found" }, { status: 404 });
+      if (!folder || !(await canUserAccessFolder(user, folder.id))) {
+        return NextResponse.json({ error: "Folder not found" }, { status: 404 });
+      }
     } else {
       const file = await prisma.file.findUnique({ where: { id: target.targetId } });
-      if (!file) return NextResponse.json({ error: "File not found" }, { status: 404 });
+      if (!file || !(await canUserAccessFolder(user, file.folderId))) {
+        return NextResponse.json({ error: "File not found" }, { status: 404 });
+      }
     }
 
     try {

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, ForbiddenError } from "@/lib/session";
 import { handleApiError } from "@/lib/api-helpers";
 import { deleteFile } from "@/lib/storage";
+import { canUserAccessFolder } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -10,7 +11,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const user = await requireUser();
     const { id } = await params;
     const file = await prisma.file.findUnique({ where: { id } });
-    if (!file) {
+    if (!file || !(await canUserAccessFolder(user, file.folderId))) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
@@ -30,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const folderId: string | null = body.folderId ? String(body.folderId) : null;
       if (folderId) {
         const folder = await prisma.folder.findUnique({ where: { id: folderId } });
-        if (!folder) {
+        if (!folder || !(await canUserAccessFolder(user, folderId))) {
           return NextResponse.json({ error: "Destination folder not found" }, { status: 404 });
         }
         destinationName = folder.name;
@@ -72,7 +73,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const user = await requireUser();
     const { id } = await params;
     const file = await prisma.file.findUnique({ where: { id } });
-    if (!file) {
+    if (!file || !(await canUserAccessFolder(user, file.folderId))) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
     if (user.role !== "ADMIN" && file.uploadedById !== user.id) {

@@ -8,14 +8,17 @@ type UserRow = {
   email: string;
   role: "ADMIN" | "TECHNICIAN";
   createdAt: string;
+  groupIds: string[];
 };
 
 export default function AdminUsersView({
   initialUsers,
   currentUserId,
+  availableGroups,
 }: {
   initialUsers: UserRow[];
   currentUserId: string;
+  availableGroups: { id: string; name: string }[];
 }) {
   const [users, setUsers] = useState(initialUsers);
   const [name, setName] = useState("");
@@ -26,8 +29,32 @@ export default function AdminUsersView({
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const adminCount = users.filter((u) => u.role === "ADMIN").length;
+
+  async function handleUpdate(u: UserRow, patch: { role?: "ADMIN" | "TECHNICIAN"; groupIds?: string[] }) {
+    setError(null);
+    setSavingId(u.id);
+    const previous = users;
+    // Optimistic update — reverted below if the request fails.
+    setUsers((prev) => prev.map((existing) => (existing.id === u.id ? { ...existing, ...patch } : existing)));
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Failed to update account");
+      setUsers((prev) => prev.map((existing) => (existing.id === u.id ? { ...existing, ...body.user } : existing)));
+    } catch (err) {
+      setUsers(previous);
+      setError(err instanceof Error ? err.message : "Failed to update account");
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   async function handleDelete(u: UserRow) {
     if (!confirm(`Delete the account for ${u.name} (${u.email})? This can't be undone.`)) return;
@@ -59,7 +86,7 @@ export default function AdminUsersView({
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Failed to create account");
 
-      setUsers((prev) => [...prev, body.user]);
+      setUsers((prev) => [...prev, { ...body.user, groupIds: [] }]);
       setSuccess(`Account created for ${body.user.name}. Share the temporary password with them directly.`);
       setName("");
       setEmail("");
@@ -148,27 +175,56 @@ export default function AdminUsersView({
             const isSelf = u.id === currentUserId;
             const isLastAdmin = u.role === "ADMIN" && adminCount <= 1;
             return (
-              <li key={u.id} className="flex items-center gap-3 px-4 py-3">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-800 truncate">{u.name}</p>
-                  <p className="text-xs text-slate-500 truncate">{u.email}</p>
-                </div>
-                <span
-                  className={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold ${
-                    u.role === "ADMIN" ? "bg-accent/10 text-accent-dark" : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {u.role === "ADMIN" ? "Admin" : "Technician"}
-                </span>
-                {!isSelf && !isLastAdmin && (
-                  <button
-                    title="Delete account"
-                    onClick={() => handleDelete(u)}
-                    disabled={deletingId === u.id}
-                    className="shrink-0 rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+              <li key={u.id} className="flex flex-col gap-2 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-800 truncate">{u.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                  </div>
+                  <select
+                    value={u.role}
+                    onChange={(e) => handleUpdate(u, { role: e.target.value as "ADMIN" | "TECHNICIAN" })}
+                    disabled={isLastAdmin || savingId === u.id}
+                    title={isLastAdmin ? "Can't demote the last admin" : undefined}
+                    className="shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 disabled:opacity-60"
                   >
-                    🗑️
-                  </button>
+                    <option value="TECHNICIAN">Technician</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                  {!isSelf && !isLastAdmin && (
+                    <button
+                      title="Delete account"
+                      onClick={() => handleDelete(u)}
+                      disabled={deletingId === u.id}
+                      className="shrink-0 rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+                {availableGroups.length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 pl-0">
+                    {availableGroups.map((g) => {
+                      const checked = u.groupIds.includes(g.id);
+                      return (
+                        <label key={g.id} className="flex items-center gap-1 text-xs text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={savingId === u.id}
+                            onChange={() => {
+                              const groupIds = checked
+                                ? u.groupIds.filter((id) => id !== g.id)
+                                : [...u.groupIds, g.id];
+                              handleUpdate(u, { groupIds });
+                            }}
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-accent focus:ring-accent"
+                          />
+                          {g.name}
+                        </label>
+                      );
+                    })}
+                  </div>
                 )}
               </li>
             );

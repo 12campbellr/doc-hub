@@ -25,6 +25,7 @@ model User {
   filesUploaded  File[]         @relation("FileUploadedBy")
   activityLogs   ActivityLog[]  @relation("ActivityLogActor")
   favorites      Favorite[]
+  groups         Group[]
 }
 
 model Folder {
@@ -41,6 +42,12 @@ model Folder {
   createdAt DateTime @default(now())
 
   favoritedBy Favorite[]
+
+  // Empty = visible to everyone (today's default). Non-empty restricts this folder
+  // (and, by inheritance walked in src/lib/permissions.ts, its whole subtree) to
+  // members of at least one of these groups. Files have no restriction of their own —
+  // they inherit their folder's.
+  restrictedByGroups Group[]
 
   @@index([parentId])
 }
@@ -103,4 +110,13 @@ model ActivityLog {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  members            User[]
+  restrictedFolders   Folder[]
 }
