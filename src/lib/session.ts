@@ -7,6 +7,7 @@ export type SessionUser = {
   name: string;
   email: string;
   role: "ADMIN" | "TECHNICIAN";
+  mustChangePassword: boolean;
 };
 
 /**
@@ -38,9 +39,25 @@ export class ForbiddenError extends Error {
   }
 }
 
-export async function requireUser(): Promise<SessionUser> {
+export class PasswordChangeRequiredError extends Error {
+  status = 403;
+  constructor(message = "Password change required") {
+    super(message);
+  }
+}
+
+/**
+ * Middleware only protects page navigation (see src/middleware.ts), so this is the
+ * defense-in-depth check that stops a flagged user from bypassing the change-password
+ * interstitial by calling mutating API routes directly. Only the password-change route
+ * itself should pass `allowPasswordChangePending: true`.
+ */
+export async function requireUser(opts?: { allowPasswordChangePending?: boolean }): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) throw new UnauthorizedError();
+  if (user.mustChangePassword && !opts?.allowPasswordChangePending) {
+    throw new PasswordChangeRequiredError();
+  }
   return user;
 }
 

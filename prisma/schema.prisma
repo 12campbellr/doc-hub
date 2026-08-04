@@ -15,6 +15,10 @@ model User {
   passwordHash String
   // Validated as "ADMIN" | "TECHNICIAN" in application code (see src/lib/session.ts).
   role         String   @default("TECHNICIAN")
+  // Forces a redirect to /change-password until cleared. New accounts start true;
+  // accounts that existed before this column was added are backfilled to false in
+  // the migration so current staff aren't interrupted (see migration.sql).
+  mustChangePassword Boolean @default(true)
   createdAt    DateTime @default(now())
 
   foldersCreated Folder[]       @relation("FolderCreatedBy")

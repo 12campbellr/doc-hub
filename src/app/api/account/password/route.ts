@@ -6,7 +6,7 @@ import { handleApiError } from "@/lib/api-helpers";
 
 export async function PATCH(req: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await requireUser({ allowPasswordChangePending: true });
     const body = await req.json();
     const currentPassword = (body?.currentPassword ?? "").toString();
     const newPassword = (body?.newPassword ?? "").toString();
@@ -29,7 +29,10 @@ export async function PATCH(req: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, mustChangePassword: false },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

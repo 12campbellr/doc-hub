@@ -31,6 +31,7 @@ export const authOptions: AuthOptions = {
           name: user.name,
           email: user.email,
           role: user.role as "ADMIN" | "TECHNICIAN",
+          mustChangePassword: user.mustChangePassword,
         };
       },
     }),
@@ -40,6 +41,7 @@ export const authOptions: AuthOptions = {
       if (user) {
         token.id = (user as any).id;
         token.role = (user as any).role;
+        token.mustChangePassword = (user as any).mustChangePassword;
       }
       return token;
     },
@@ -47,6 +49,7 @@ export const authOptions: AuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
+        (session.user as any).mustChangePassword = token.mustChangePassword;
       }
       return session;
     },

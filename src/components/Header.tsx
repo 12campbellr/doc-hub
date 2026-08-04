@@ -9,6 +9,27 @@ export default async function Header() {
   const user = await getCurrentUser();
   if (!user) return null;
 
+  // While a password change is pending, every other route bounces back to
+  // /change-password anyway (see src/middleware.ts) — skip the dead-end nav links.
+  if (user.mustChangePassword) {
+    return (
+      <header className="sticky top-0 z-10 bg-navy-900 text-white shadow-md">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+          <Link href="/change-password" className="flex items-center gap-2 shrink-0">
+            <Logo className="h-8 w-8 shrink-0" />
+            <span className="text-lg font-semibold tracking-tight">
+              DOC <span className="text-accent">Hub</span>
+            </span>
+          </Link>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden sm:inline text-sm text-slate-400 px-2">{user.name}</span>
+            <SignOutButton />
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="sticky top-0 z-10 bg-navy-900 text-white shadow-md">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">

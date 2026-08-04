@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from "react";
 
-export default function ChangePasswordForm() {
+export default function ChangePasswordForm({ onSuccess }: { onSuccess?: () => void }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -34,6 +34,7 @@ export default function ChangePasswordForm() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to change password");
     } finally {
