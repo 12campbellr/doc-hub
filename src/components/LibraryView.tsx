@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, type DragEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Crumb, CurrentUser, FileSummary, FolderSummary } from "@/lib/types";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, getFileKind } from "@/lib/format";
 import FileTypeIcon from "@/components/FileTypeIcon";
 import TagPicker from "@/components/TagPicker";
 
@@ -60,6 +60,8 @@ export default function LibraryView({
     null
   );
   const [moveDestination, setMoveDestination] = useState<string>("");
+
+  const [previewFile, setPreviewFile] = useState<FileSummary | null>(null);
 
   const [restrictingFolder, setRestrictingFolder] = useState<FolderSummary | null>(null);
   const [allGroups, setAllGroups] = useState<{ id: string; name: string }[] | null>(null);
@@ -641,6 +643,21 @@ export default function LibraryView({
       {files.length > 0 ? (
         <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white overflow-hidden">
           {files.map((file) => {
+            const fileKind = getFileKind(file.mimeType);
+            const isPreviewable = fileKind === "pdf" || fileKind === "image";
+            const nameContent = (
+              <>
+                <span className="truncate">{file.displayName}</span>
+                {file.tags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-600"
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+              </>
+            );
             return (
               <li key={file.id} className="flex items-center gap-3 px-4 py-3">
                 <input
@@ -661,6 +678,14 @@ export default function LibraryView({
                     onBlur={saveEditing}
                     className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm"
                   />
+                ) : isPreviewable ? (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFile(file)}
+                    className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5 text-left font-medium text-slate-800 hover:text-accent-dark"
+                  >
+                    {nameContent}
+                  </button>
                 ) : (
                   <a
                     href={`/api/files/${file.id}/download`}
@@ -668,15 +693,7 @@ export default function LibraryView({
                     rel="noreferrer"
                     className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5 font-medium text-slate-800 hover:text-accent-dark"
                   >
-                    <span className="truncate">{file.displayName}</span>
-                    {file.tags.map((tag) => (
-                      <span
-                        key={tag.id}
-                        className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-600"
-                      >
-                        {tag.name}
-                      </span>
-                    ))}
+                    {nameContent}
                   </a>
                 )}
 
@@ -781,6 +798,46 @@ export default function LibraryView({
                 Move
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* File preview modal */}
+      {previewFile && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-3xl rounded-lg bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h2 className="text-base font-semibold text-slate-800 truncate">{previewFile.displayName}</h2>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  title="Download"
+                  href={`/api/files/${previewFile.id}/download?download=1`}
+                  className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  ⬇️
+                </a>
+                <button
+                  onClick={() => setPreviewFile(null)}
+                  className="rounded-md px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            {getFileKind(previewFile.mimeType) === "image" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/api/files/${previewFile.id}/download`}
+                alt={previewFile.displayName}
+                className="max-h-[70vh] w-full rounded-md object-contain"
+              />
+            ) : (
+              <iframe
+                src={`/api/files/${previewFile.id}/download`}
+                title={previewFile.displayName}
+                className="h-[70vh] w-full rounded-md border border-slate-200"
+              />
+            )}
           </div>
         </div>
       )}
