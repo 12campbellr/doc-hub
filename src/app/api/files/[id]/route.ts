@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const body = await req.json();
-    const data: { displayName?: string; folderId?: string | null } = {};
+    const data: { displayName?: string; folderId?: string | null; tags?: { set: { id: string }[] } } = {};
     let destinationName: string | null = null;
 
     if (typeof body?.displayName === "string") {
@@ -39,6 +39,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         destinationName = "Home";
       }
       data.folderId = folderId;
+    }
+
+    if ("tagIds" in body) {
+      if (user.role !== "ADMIN" && file.uploadedById !== user.id) {
+        throw new ForbiddenError("Only an admin or the uploader can change this file's tags");
+      }
+      const tagIds: string[] = Array.isArray(body.tagIds) ? body.tagIds.map(String) : [];
+      data.tags = { set: tagIds.map((tagId) => ({ id: tagId })) };
     }
 
     const updated = await prisma.file.update({ where: { id: file.id }, data });

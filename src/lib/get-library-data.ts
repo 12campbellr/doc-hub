@@ -11,12 +11,12 @@ export async function getLibraryData(folderId: string | null, user: SessionUser)
     prisma.folder.findMany({
       where: { parentId: folderId },
       orderBy: { name: "asc" },
-      include: { restrictedByGroups: { select: { id: true } } },
+      include: { restrictedByGroups: { select: { id: true } }, tags: { select: { id: true, name: true } } },
     }),
     prisma.file.findMany({
       where: { folderId },
       orderBy: { displayName: "asc" },
-      include: { uploadedBy: { select: { name: true } } },
+      include: { uploadedBy: { select: { name: true } }, tags: { select: { id: true, name: true } } },
     }),
   ]);
 
@@ -56,6 +56,7 @@ export async function getLibraryData(folderId: string | null, user: SessionUser)
     parentId: f.parentId,
     createdById: f.createdById,
     restrictedGroupIds: f.restrictedByGroups.map((g) => g.id),
+    tags: f.tags,
   }));
 
   const fileSummaries: FileSummary[] = files.map((f) => ({
@@ -67,6 +68,7 @@ export async function getLibraryData(folderId: string | null, user: SessionUser)
     createdAt: f.createdAt.toISOString(),
     uploadedById: f.uploadedById,
     uploadedByName: f.uploadedBy?.name ?? "Removed user",
+    tags: f.tags,
   }));
 
   return {

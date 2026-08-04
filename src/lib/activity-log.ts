@@ -14,7 +14,9 @@ export type ActivityAction =
   | "USER_UPDATE"
   | "USER_DELETE"
   | "GROUP_CREATE"
-  | "GROUP_DELETE";
+  | "GROUP_DELETE"
+  | "TAG_CREATE"
+  | "TAG_DELETE";
 
 export const ACTIVITY_LABELS: Record<ActivityAction, string> = {
   FOLDER_CREATE: "created folder",
@@ -31,6 +33,8 @@ export const ACTIVITY_LABELS: Record<ActivityAction, string> = {
   USER_DELETE: "deleted account for",
   GROUP_CREATE: "created group",
   GROUP_DELETE: "deleted group",
+  TAG_CREATE: "created tag",
+  TAG_DELETE: "deleted tag",
 };
 
 /**
@@ -40,7 +44,7 @@ export const ACTIVITY_LABELS: Record<ActivityAction, string> = {
  */
 export async function logActivity(entry: {
   action: ActivityAction;
-  targetType: "FOLDER" | "FILE" | "USER" | "GROUP";
+  targetType: "FOLDER" | "FILE" | "USER" | "GROUP" | "TAG";
   targetName: string;
   details?: string;
   actorId: string;

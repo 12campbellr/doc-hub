@@ -80,6 +80,12 @@ export default async function Header() {
                 Groups
               </Link>
               <Link
+                href="/admin/tags"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-navy-700 hover:text-white transition-colors"
+              >
+                Tags
+              </Link>
+              <Link
                 href="/admin/activity"
                 className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-navy-700 hover:text-white transition-colors"
               >

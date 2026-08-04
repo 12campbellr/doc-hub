@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Crumb, CurrentUser, FileSummary, FolderSummary } from "@/lib/types";
 import { formatBytes } from "@/lib/format";
 import FileTypeIcon from "@/components/FileTypeIcon";
+import TagPicker from "@/components/TagPicker";
 
 async function apiFetch(url: string, options?: RequestInit) {
   const res = await fetch(url, options);
@@ -196,6 +197,18 @@ export default function LibraryView({
     if (!confirm(`Delete "${file.displayName}"? This can't be undone.`)) return;
     await withBusy(async () => {
       await apiFetch(`/api/files/${file.id}`, { method: "DELETE" });
+      refresh();
+    });
+  }
+
+  async function handleTagsChange(type: "folder" | "file", id: string, tagIds: string[]) {
+    await withBusy(async () => {
+      const url = type === "folder" ? `/api/folders/${id}` : `/api/files/${id}`;
+      await apiFetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tagIds }),
+      });
       refresh();
     });
   }
@@ -553,13 +566,21 @@ export default function LibraryView({
                   className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm"
                 />
               ) : (
-                <Link href={`/folder/${folder.id}`} className="flex-1 min-w-0 flex items-center gap-1.5 font-medium text-slate-800 hover:text-accent-dark">
+                <Link href={`/folder/${folder.id}`} className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5 font-medium text-slate-800 hover:text-accent-dark">
                   <span className="truncate">{folder.name}</span>
                   {folder.restrictedGroupIds.length > 0 && (
                     <span title="Restricted to specific groups" aria-hidden className="shrink-0 text-sm">
                       🔒
                     </span>
                   )}
+                  {folder.tags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-600"
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
                 </Link>
               )}
               <div className="flex items-center gap-1 shrink-0">
@@ -592,6 +613,14 @@ export default function LibraryView({
                   >
                     🔒
                   </button>
+                )}
+                {canManage(currentUser, folder.createdById) && (
+                  <TagPicker
+                    label="Tags"
+                    selectedIds={folder.tags.map((t) => t.id)}
+                    onChange={(tagIds) => handleTagsChange("folder", folder.id, tagIds)}
+                    disabled={busy}
+                  />
                 )}
                 {canManage(currentUser, folder.createdById) && (
                   <button
@@ -637,9 +666,17 @@ export default function LibraryView({
                     href={`/api/files/${file.id}/download`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex-1 min-w-0 truncate font-medium text-slate-800 hover:text-accent-dark"
+                    className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5 font-medium text-slate-800 hover:text-accent-dark"
                   >
-                    {file.displayName}
+                    <span className="truncate">{file.displayName}</span>
+                    {file.tags.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-600"
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
                   </a>
                 )}
 
@@ -679,6 +716,14 @@ export default function LibraryView({
                   >
                     ⬇️
                   </a>
+                  {canManage(currentUser, file.uploadedById) && (
+                    <TagPicker
+                      label="Tags"
+                      selectedIds={file.tags.map((t) => t.id)}
+                      onChange={(tagIds) => handleTagsChange("file", file.id, tagIds)}
+                      disabled={busy}
+                    />
+                  )}
                   {canManage(currentUser, file.uploadedById) && (
                     <button
                       title="Delete"

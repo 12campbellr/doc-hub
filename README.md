@@ -1,6 +1,6 @@
 # DOC Hub
 
-Shared document & manual library for DOC Services field technicians. Everyone signs in with their own account; all folders and files are visible to the whole team.
+Shared document & manual library for DOC Services field technicians. Everyone signs in with their own account; folders and files are visible to the whole team unless an admin restricts one to specific groups.
 
 ## Running it locally
 
@@ -31,12 +31,16 @@ Change this immediately: create your own admin account from **Users** in the top
 - Shared folder tree: create folders, upload files/photos (including directly from a phone camera), rename, move, delete
 - Delete is restricted to admins or whoever uploaded/created the item
 - Select multiple files/folders and download them as a single ZIP (folder structure preserved)
+- New accounts must set their own password on first login
+- Admins can restrict a folder (and everything inside it) to one or more groups; manage groups and group membership from **Groups**/**Users**
+- Folders and files can be tagged from an admin-managed tag list (**Tags**); admins and owners apply tags from the library
 - Mobile-responsive layout; "Add to Home Screen" support via the PWA manifest
 
 ## Project layout
 
-- `prisma/schema.prisma` — data model (User, Folder, File), Postgres
+- `prisma/schema.prisma` — data model (User, Folder, File, Group, Tag), Postgres
 - `src/lib/auth.ts`, `src/middleware.ts` — authentication & route protection
+- `src/lib/permissions.ts` — group-based folder visibility filtering
 - `src/lib/storage.ts` — file storage via Vercel Blob
 - `src/app/api/*` — folders/files/admin-users API routes
 - `src/components/LibraryView.tsx` — the main folder/file browser UI

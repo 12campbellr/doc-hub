@@ -20,6 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       name?: string;
       parentId?: string | null;
       restrictedByGroups?: { set: { id: string }[] };
+      tags?: { set: { id: string }[] };
     } = {};
     let destinationName: string | null = null;
     let restrictionChanged = false;
@@ -63,6 +64,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const groupIds: string[] = Array.isArray(body.groupIds) ? body.groupIds.map(String) : [];
       data.restrictedByGroups = { set: groupIds.map((groupId) => ({ id: groupId })) };
       restrictionChanged = true;
+    }
+
+    if ("tagIds" in body) {
+      if (user.role !== "ADMIN" && folder.createdById !== user.id) {
+        throw new ForbiddenError("Only an admin or the folder's creator can change its tags");
+      }
+      const tagIds: string[] = Array.isArray(body.tagIds) ? body.tagIds.map(String) : [];
+      data.tags = { set: tagIds.map((tagId) => ({ id: tagId })) };
     }
 
     const updated = await prisma.folder.update({ where: { id: folder.id }, data });
