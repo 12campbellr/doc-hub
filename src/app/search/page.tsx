@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { searchLibrary } from "@/lib/search";
-import { formatBytes, getFileKind, FILE_KIND_STYLES } from "@/lib/format";
+import { formatBytes } from "@/lib/format";
 import BreadcrumbPath from "@/components/BreadcrumbPath";
+import FileTypeIcon from "@/components/FileTypeIcon";
 
 export default async function SearchPage({
   searchParams,
@@ -65,15 +66,9 @@ export default async function SearchPage({
           <h2 className="text-sm font-medium text-slate-600 mb-2">Documents</h2>
           <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white overflow-hidden">
             {files.map((file) => {
-              const kind = getFileKind(file.mimeType);
-              const style = FILE_KIND_STYLES[kind];
               return (
                 <li key={file.id} className="flex items-center gap-3 px-4 py-3">
-                  <span
-                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${style.className}`}
-                  >
-                    {style.label}
-                  </span>
+                  <FileTypeIcon fileId={file.id} mimeType={file.mimeType} />
                   <a
                     href={`/api/files/${file.id}/download`}
                     target="_blank"

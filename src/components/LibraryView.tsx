@@ -4,7 +4,8 @@ import { useMemo, useRef, useState, type DragEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Crumb, CurrentUser, FileSummary, FolderSummary } from "@/lib/types";
-import { formatBytes, getFileKind, FILE_KIND_STYLES } from "@/lib/format";
+import { formatBytes } from "@/lib/format";
+import FileTypeIcon from "@/components/FileTypeIcon";
 
 async function apiFetch(url: string, options?: RequestInit) {
   const res = await fetch(url, options);
@@ -517,8 +518,6 @@ export default function LibraryView({
       {files.length > 0 ? (
         <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white overflow-hidden">
           {files.map((file) => {
-            const kind = getFileKind(file.mimeType);
-            const style = FILE_KIND_STYLES[kind];
             return (
               <li key={file.id} className="flex items-center gap-3 px-4 py-3">
                 {isAdmin && (
@@ -530,11 +529,7 @@ export default function LibraryView({
                     aria-label={`Select ${file.displayName}`}
                   />
                 )}
-                <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${style.className}`}
-                >
-                  {style.label}
-                </span>
+                <FileTypeIcon fileId={file.id} mimeType={file.mimeType} />
 
                 {editing?.type === "file" && editing.id === file.id ? (
                   <input

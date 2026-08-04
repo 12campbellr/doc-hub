@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import BreadcrumbPath from "@/components/BreadcrumbPath";
-import { formatBytes, getFileKind, FILE_KIND_STYLES } from "@/lib/format";
+import FileTypeIcon from "@/components/FileTypeIcon";
+import { formatBytes } from "@/lib/format";
 import type { FavoriteFolderItem, FavoriteFileItem } from "@/lib/favorites";
 
 async function apiFetch(url: string, options?: RequestInit) {
@@ -94,8 +95,6 @@ export default function FavoritesView({
           <h2 className="text-sm font-medium text-slate-600 mb-2">Documents</h2>
           <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white overflow-hidden">
             {files.map((file) => {
-              const kind = getFileKind(file.mimeType);
-              const style = FILE_KIND_STYLES[kind];
               return (
                 <li key={file.id} className="flex items-center gap-3 px-4 py-3">
                   <button
@@ -105,11 +104,7 @@ export default function FavoritesView({
                   >
                     ⭐
                   </button>
-                  <span
-                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${style.className}`}
-                  >
-                    {style.label}
-                  </span>
+                  <FileTypeIcon fileId={file.id} mimeType={file.mimeType} />
                   <a
                     href={`/api/files/${file.id}/download`}
                     target="_blank"
