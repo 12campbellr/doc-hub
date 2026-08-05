@@ -7,6 +7,9 @@ import type { Crumb, CurrentUser, FileSummary, FolderSummary } from "@/lib/types
 import { formatBytes, getFileKind } from "@/lib/format";
 import FileTypeIcon from "@/components/FileTypeIcon";
 import TagPicker from "@/components/TagPicker";
+import RowMenu from "@/components/RowMenu";
+
+const menuItemClass = "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50";
 
 async function apiFetch(url: string, options?: RequestInit) {
   const res = await fetch(url, options);
@@ -593,29 +596,6 @@ export default function LibraryView({
                 >
                   {favFolders.has(folder.id) ? "⭐" : "☆"}
                 </button>
-                <button
-                  title="Rename"
-                  onClick={() => startEditing("folder", folder.id, folder.name)}
-                  className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                >
-                  ✏️
-                </button>
-                <button
-                  title="Move"
-                  onClick={() => openMoveModal([{ type: "folder", id: folder.id, name: folder.name }])}
-                  className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                >
-                  📦
-                </button>
-                {isAdmin && (
-                  <button
-                    title="Restrict access"
-                    onClick={() => openRestrictionModal(folder)}
-                    className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                  >
-                    🔒
-                  </button>
-                )}
                 {canManage(currentUser, folder.createdById) && (
                   <TagPicker
                     label="Tags"
@@ -624,15 +604,27 @@ export default function LibraryView({
                     disabled={busy}
                   />
                 )}
-                {canManage(currentUser, folder.createdById) && (
-                  <button
-                    title="Delete"
-                    onClick={() => handleDeleteFolder(folder)}
-                    className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                  >
-                    🗑️
+                <RowMenu>
+                  <button onClick={() => startEditing("folder", folder.id, folder.name)} className={menuItemClass}>
+                    ✏️ Rename
                   </button>
-                )}
+                  <button
+                    onClick={() => openMoveModal([{ type: "folder", id: folder.id, name: folder.name }])}
+                    className={menuItemClass}
+                  >
+                    📦 Move
+                  </button>
+                  {isAdmin && (
+                    <button onClick={() => openRestrictionModal(folder)} className={menuItemClass}>
+                      🔒 Restrict access
+                    </button>
+                  )}
+                  {canManage(currentUser, folder.createdById) && (
+                    <button onClick={() => handleDeleteFolder(folder)} className={`${menuItemClass} text-red-600`}>
+                      🗑️ Delete
+                    </button>
+                  )}
+                </RowMenu>
               </div>
             </li>
           ))}
@@ -712,20 +704,6 @@ export default function LibraryView({
                   >
                     {favFiles.has(file.id) ? "⭐" : "☆"}
                   </button>
-                  <button
-                    title="Rename"
-                    onClick={() => startEditing("file", file.id, file.displayName)}
-                    className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    title="Move"
-                    onClick={() => openMoveModal([{ type: "file", id: file.id, name: file.displayName }])}
-                    className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                  >
-                    📦
-                  </button>
                   <a
                     title="Download"
                     href={`/api/files/${file.id}/download?download=1`}
@@ -741,15 +719,22 @@ export default function LibraryView({
                       disabled={busy}
                     />
                   )}
-                  {canManage(currentUser, file.uploadedById) && (
-                    <button
-                      title="Delete"
-                      onClick={() => handleDeleteFile(file)}
-                      className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                    >
-                      🗑️
+                  <RowMenu>
+                    <button onClick={() => startEditing("file", file.id, file.displayName)} className={menuItemClass}>
+                      ✏️ Rename
                     </button>
-                  )}
+                    <button
+                      onClick={() => openMoveModal([{ type: "file", id: file.id, name: file.displayName }])}
+                      className={menuItemClass}
+                    >
+                      📦 Move
+                    </button>
+                    {canManage(currentUser, file.uploadedById) && (
+                      <button onClick={() => handleDeleteFile(file)} className={`${menuItemClass} text-red-600`}>
+                        🗑️ Delete
+                      </button>
+                    )}
+                  </RowMenu>
                 </div>
               </li>
             );
