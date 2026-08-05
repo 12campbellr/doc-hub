@@ -46,7 +46,7 @@ export default async function Header() {
           </Suspense>
         </div>
 
-        <nav className="ml-auto flex items-center gap-1 sm:gap-2">
+        <nav className="ml-auto flex flex-wrap items-center justify-end gap-1 sm:gap-2">
           <Link
             href="/"
             className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-navy-700 hover:text-white transition-colors"
